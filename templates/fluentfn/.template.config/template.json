@@ -1,0 +1,305 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "FluentFunctions",
+  "classifications": [
+    "Azure",
+    "Functions",
+    "Cloud",
+    "Serverless"
+  ],
+  "identity": "FluentFunctions.Templates.Functions",
+  "groupIdentity": "FluentFunctions.Templates.Functions",
+  "name": "FluentFunctions: Azure Functions app (.NET isolated, Flex Consumption)",
+  "description": "A production-ready Azure Functions app: functional core, thin trigger adapters, validated configuration, managed identity, OpenTelemetry, Bicep or Terraform (AVM) and Azure DevOps pipelines.",
+  "shortName": "fluentfn",
+  "sourceName": "FluentFunctions",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "trigger": {
+      "type": "parameter",
+      "datatype": "choice",
+      "allowMultipleValues": true,
+      "enableQuotelessLiterals": true,
+      "description": "The starter triggers to include. Repeat the option to pick several, e.g. --trigger http --trigger servicebus.",
+      "defaultValue": "http",
+      "choices": [
+        {
+          "choice": "http",
+          "description": "HTTP trigger (POST /api/orders)."
+        },
+        {
+          "choice": "servicebus",
+          "description": "Service Bus queue trigger with complete/dead-letter settlement."
+        },
+        {
+          "choice": "timer",
+          "description": "Timer trigger for scheduled clean-up."
+        }
+      ]
+    },
+    "iac": {
+      "type": "parameter",
+      "datatype": "choice",
+      "enableQuotelessLiterals": true,
+      "description": "The infrastructure-as-code flavour.",
+      "defaultValue": "bicep",
+      "choices": [
+        {
+          "choice": "bicep",
+          "description": "Bicep with Azure Verified Modules."
+        },
+        {
+          "choice": "terraform",
+          "description": "Terraform with Azure Verified Modules."
+        },
+        {
+          "choice": "none",
+          "description": "No infrastructure code."
+        }
+      ]
+    },
+    "pipeline": {
+      "type": "parameter",
+      "datatype": "choice",
+      "enableQuotelessLiterals": true,
+      "description": "The CI/CD pipeline to include.",
+      "defaultValue": "azdo",
+      "choices": [
+        {
+          "choice": "azdo",
+          "description": "Azure DevOps YAML pipelines."
+        },
+        {
+          "choice": "none",
+          "description": "No pipeline."
+        }
+      ]
+    },
+    "UseHttp": {
+      "type": "computed",
+      "value": "(trigger == http)"
+    },
+    "UseServiceBus": {
+      "type": "computed",
+      "value": "(trigger == servicebus)"
+    },
+    "UseTimer": {
+      "type": "computed",
+      "value": "(trigger == timer)"
+    },
+    "UseOrders": {
+      "type": "computed",
+      "value": "(UseHttp || UseServiceBus)"
+    },
+    "UseBicep": {
+      "type": "computed",
+      "value": "(iac == bicep)"
+    },
+    "UseTerraform": {
+      "type": "computed",
+      "value": "(iac == terraform)"
+    },
+    "UseIac": {
+      "type": "computed",
+      "value": "(iac != none)"
+    },
+    "UseAzdo": {
+      "type": "computed",
+      "value": "(pipeline == azdo)"
+    },
+    "appNameLower": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "name",
+        "toLower": true
+      }
+    },
+    "appShortName": {
+      "type": "generated",
+      "generator": "regex",
+      "replaces": "fnappname",
+      "parameters": {
+        "source": "appNameLower",
+        "steps": [
+          {
+            "regex": "[^a-z0-9]",
+            "replacement": ""
+          },
+          {
+            "regex": "^(.{0,12}).*$",
+            "replacement": "$1"
+          }
+        ]
+      }
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.terraform/**",
+            "**/*.user"
+          ]
+        },
+        {
+          "condition": "(!UseHttp)",
+          "exclude": [
+            "src/FluentFunctions.Functions/Http/**"
+          ]
+        },
+        {
+          "condition": "(!UseServiceBus)",
+          "exclude": [
+            "src/FluentFunctions.Functions/ServiceBus/**",
+            "src/FluentFunctions.Functions/Configuration/ServiceBusOptions.cs"
+          ]
+        },
+        {
+          "condition": "(!UseTimer)",
+          "exclude": [
+            "src/FluentFunctions.Functions/Timer/**",
+            "src/FluentFunctions.Functions/Configuration/CleanupOptions.cs",
+            "src/FluentFunctions.Core/Maintenance/**",
+            "tests/FluentFunctions.Core.Tests/CleanupHandlersTests.cs"
+          ]
+        },
+        {
+          "condition": "(!UseOrders)",
+          "exclude": [
+            "src/FluentFunctions.Core/Orders/**",
+            "src/FluentFunctions.Functions/Configuration/OrdersOptions.cs",
+            "tests/FluentFunctions.Core.Tests/OrderHandlersTests.cs"
+          ]
+        },
+        {
+          "condition": "(!UseBicep)",
+          "exclude": [
+            "infra/bicep/**",
+            "pipelines/templates/infra-bicep.yml"
+          ]
+        },
+        {
+          "condition": "(!UseTerraform)",
+          "exclude": [
+            "infra/terraform/**",
+            "pipelines/templates/infra-terraform.yml"
+          ]
+        },
+        {
+          "condition": "(!UseAzdo)",
+          "exclude": [
+            "pipelines/**"
+          ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    {
+      "path": "FluentFunctions.slnx"
+    }
+  ],
+  "postActions": [],
+  "SpecialCustomOperations": {
+    "**/*.bicep": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "if": [
+              "//#if"
+            ],
+            "else": [
+              "//#else"
+            ],
+            "elseif": [
+              "//#elseif"
+            ],
+            "endif": [
+              "//#endif"
+            ],
+            "trim": true,
+            "wholeLine": true
+          }
+        }
+      ]
+    },
+    "**/*.bicepparam": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "if": [
+              "//#if"
+            ],
+            "else": [
+              "//#else"
+            ],
+            "elseif": [
+              "//#elseif"
+            ],
+            "endif": [
+              "//#endif"
+            ],
+            "trim": true,
+            "wholeLine": true
+          }
+        }
+      ]
+    },
+    "**/*.tf": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "if": [
+              "//#if"
+            ],
+            "else": [
+              "//#else"
+            ],
+            "elseif": [
+              "//#elseif"
+            ],
+            "endif": [
+              "//#endif"
+            ],
+            "trim": true,
+            "wholeLine": true
+          }
+        }
+      ]
+    },
+    "**/*.md": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "if": [
+              "//#if"
+            ],
+            "else": [
+              "//#else"
+            ],
+            "elseif": [
+              "//#elseif"
+            ],
+            "endif": [
+              "//#endif"
+            ],
+            "trim": true,
+            "wholeLine": true
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,80 @@
+# FluentFunctions CI/CD for Azure DevOps.
+#
+# Build and test on every PR and push; validate the infrastructure against each environment;
+# deploy main to dev -> test -> prod. Approvals and checks are configured on the Azure DevOps
+# environments (Pipelines > Environments), not in YAML, so they can't be bypassed by editing this file.
+#
+# One-off setup: see README.md > "Pipeline setup".
+
+trigger:
+  branches:
+    include: [main]
+
+pr:
+  branches:
+    include: [main]
+
+variables:
+  - name: appName
+    value: fnappname
+  - name: location
+    value: uksouth
+#if (UseTerraform)
+  # Terraform state: an existing storage account with one container per environment
+  # (tfstate-dev, tfstate-test, tfstate-prod). The service connections need Storage Blob Data Contributor on it.
+  - name: tfStateResourceGroup
+    value: rg-tfstate
+  - name: tfStateStorageAccount
+    value: sttfstatechangeme
+#endif
+
+stages:
+  - stage: Build
+    displayName: Build and test
+    jobs:
+      - template: templates/build.yml
+#if (UseIac)
+
+  - stage: Validate
+    displayName: Validate infrastructure
+    dependsOn: []
+    jobs:
+      - ${{ each env in split('dev,test,prod', ',') }}:
+          - job: validate_${{ env }}
+            displayName: ${{ env }}
+            pool:
+              vmImage: ubuntu-latest
+            steps:
+#if (UseBicep)
+              - template: templates/infra-bicep.yml
+                parameters:
+                  mode: whatif
+#else
+              - template: templates/infra-terraform.yml
+                parameters:
+                  mode: plan
+#endif
+                  environmentName: ${{ env }}
+                  serviceConnection: sc-${{ variables.appName }}-${{ env }}
+                  resourceGroup: rg-${{ variables.appName }}-${{ env }}
+                  location: $(location)
+#endif
+
+  - template: templates/deploy-stage.yml
+    parameters:
+      environmentName: dev
+#if (UseIac)
+      dependsOn: [Build, Validate]
+#else
+      dependsOn: [Build]
+#endif
+
+  - template: templates/deploy-stage.yml
+    parameters:
+      environmentName: test
+      dependsOn: [deploy_dev]
+
+  - template: templates/deploy-stage.yml
+    parameters:
+      environmentName: prod
+      dependsOn: [deploy_test]

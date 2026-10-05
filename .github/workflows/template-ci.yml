@@ -1,0 +1,103 @@
+name: Template CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  combinations:
+    name: Generate, build, test and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Bicep
+        run: |
+          curl -sSLo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x bicep && sudo mv bicep /usr/local/bin/bicep
+          bicep --version
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Test every option combination
+        run: scripts/test-template.sh
+
+  pack:
+    name: Pack
+    needs: combinations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack
+        run: dotnet pack FluentFunctions.Templates.csproj -c Release -o artifacts/package -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Smoke-test the package
+        run: |
+          dotnet new install artifacts/package/*.nupkg
+          dotnet new fluentfn --name Smoke.Test --output "$RUNNER_TEMP/smoke"
+          dotnet build "$RUNNER_TEMP/smoke" -c Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: artifacts/package/*.nupkg
+
+  publish:
+    name: Publish to internal feed
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: package
+          path: package
+
+      # NUGET_FEED_URL: the internal feed's v3 index, e.g. an Azure Artifacts feed.
+      # NUGET_API_KEY: a key or PAT with push rights (Azure Artifacts accepts any non-empty key with a PAT source).
+      - name: Push
+        env:
+          NUGET_FEED_URL: ${{ vars.NUGET_FEED_URL }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_FEED_URL" ] || [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::Set the NUGET_FEED_URL variable and NUGET_API_KEY secret on the 'release' environment."
+            exit 1
+          fi
+          dotnet nuget push package/*.nupkg --source "$NUGET_FEED_URL" --api-key "$NUGET_API_KEY" --skip-duplicate

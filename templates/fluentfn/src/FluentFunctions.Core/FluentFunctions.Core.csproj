@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The core has no Azure or Functions dependencies on purpose: see docs/architecture.md. -->
+  <PropertyGroup>
+    <RootNamespace>FluentFunctions.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

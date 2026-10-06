@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FluentFunctions.Core/FluentFunctions.Core.csproj" />
+    <Project Path="src/FluentFunctions.Functions/FluentFunctions.Functions.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FluentFunctions.Core.Tests/FluentFunctions.Core.Tests.csproj" />
+  </Folder>
+</Solution>

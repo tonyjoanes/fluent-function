@@ -1,0 +1,46 @@
+# Terraform: plan on validation, plan + apply on deploy. Sets $(functionAppName) on deploy.
+# State lives in the storage account named by the tfStateStorageAccount / tfStateResourceGroup
+# pipeline variables, one container per environment, accessed with Entra ID (no access keys).
+parameters:
+  - name: mode
+    type: string
+    values: [plan, apply]
+  - name: environmentName
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: resourceGroup
+    type: string
+  - name: location
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: Terraform ${{ parameters.mode }} (${{ parameters.environmentName }})
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      addSpnToEnvironment: true
+      workingDirectory: infra/terraform
+      inlineScript: |
+        set -euo pipefail
+        # Authenticate the providers with the service connection's workload identity federation.
+        export ARM_CLIENT_ID="$servicePrincipalId" ARM_TENANT_ID="$tenantId" ARM_OIDC_TOKEN="$idToken" ARM_USE_OIDC=true
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+        az group create --name '${{ parameters.resourceGroup }}' --location '${{ parameters.location }}' --output none
+
+        terraform init -input=false \
+          -backend-config="resource_group_name=$(tfStateResourceGroup)" \
+          -backend-config="storage_account_name=$(tfStateStorageAccount)" \
+          -backend-config="container_name=tfstate-${{ parameters.environmentName }}" \
+          -backend-config="key=$(appName).tfstate"
+        terraform validate
+        terraform plan -input=false -out=tfplan \
+          -var-file='${{ parameters.environmentName }}.tfvars' \
+          -var='resource_group_name=${{ parameters.resourceGroup }}'
+
+        if [ '${{ parameters.mode }}' = 'apply' ]; then
+          terraform apply -input=false tfplan
+          echo "##vso[task.setvariable variable=functionAppName]$(terraform output -raw function_app_name)"
+        fi

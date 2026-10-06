@@ -1,0 +1,63 @@
+# One environment: deploy the infrastructure, then the app, inside an Azure DevOps environment so
+# its approvals and checks gate the stage.
+parameters:
+  - name: environmentName
+    type: string
+  - name: dependsOn
+    type: object
+
+stages:
+  - stage: deploy_${{ parameters.environmentName }}
+    displayName: Deploy ${{ parameters.environmentName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      resourceGroup: rg-${{ variables.appName }}-${{ parameters.environmentName }}
+#if (!UseIac)
+      # Without infrastructure code, name the existing Function app here.
+      functionAppName: func-${{ variables.appName }}-${{ parameters.environmentName }}
+#endif
+    jobs:
+      - deployment: deploy
+        displayName: Deploy
+        environment: ${{ variables.appName }}-${{ parameters.environmentName }}
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+#if (UseBicep)
+
+                - template: infra-bicep.yml
+                  parameters:
+                    mode: deploy
+                    environmentName: ${{ parameters.environmentName }}
+                    serviceConnection: sc-${{ variables.appName }}-${{ parameters.environmentName }}
+                    resourceGroup: rg-${{ variables.appName }}-${{ parameters.environmentName }}
+                    location: $(location)
+#endif
+#if (UseTerraform)
+
+                - template: infra-terraform.yml
+                  parameters:
+                    mode: apply
+                    environmentName: ${{ parameters.environmentName }}
+                    serviceConnection: sc-${{ variables.appName }}-${{ parameters.environmentName }}
+                    resourceGroup: rg-${{ variables.appName }}-${{ parameters.environmentName }}
+                    location: $(location)
+#endif
+
+                - task: AzureCLI@2
+                  displayName: Deploy function app
+                  inputs:
+                    azureSubscription: sc-${{ variables.appName }}-${{ parameters.environmentName }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      az functionapp deployment source config-zip \
+                        --resource-group '$(resourceGroup)' \
+                        --name '$(functionAppName)' \
+                        --src '$(Pipeline.Workspace)/functions/functions.zip'

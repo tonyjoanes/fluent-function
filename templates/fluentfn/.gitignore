@@ -1,0 +1,19 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+TestResults/
+publish/
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl.bak
+# Bicep build output
+infra/bicep/*.json
+# Azurite
+__azurite_db*
+__blobstorage__/
+__queuestorage__/

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "labels": ["dependencies"],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Functions worker packages move together.",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["Microsoft.Azure.Functions.Worker{/,}**"],
+      "groupName": "Azure Functions worker"
+    },
+    {
+      "description": "OpenTelemetry packages move together.",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["OpenTelemetry{/,}**", "Azure.Monitor.OpenTelemetry{/,}**"],
+      "groupName": "OpenTelemetry"
+    },
+    {
+      "description": "AVM Bicep modules: one PR so both IaC flavours can be checked for parity.",
+      "matchManagers": ["bicep"],
+      "matchPackageNames": ["br/public:avm/**"],
+      "groupName": "AVM Bicep modules"
+    },
+    {
+      "description": "AVM Terraform modules and providers.",
+      "matchManagers": ["terraform"],
+      "groupName": "Terraform AVM modules and providers"
+    }
+  ]
+}

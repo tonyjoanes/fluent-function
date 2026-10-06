@@ -1,0 +1,42 @@
+jobs:
+  - job: build
+    displayName: Build, test, publish
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+      - task: UseDotNet@2
+        displayName: Use .NET SDK
+        inputs:
+          useGlobalJson: true
+
+      - script: dotnet restore
+        displayName: Restore
+
+      - script: dotnet build --configuration Release --no-restore
+        displayName: Build (warnings are errors)
+
+      - script: dotnet test --configuration Release --no-build --report-xunit-trx --results-directory $(Agent.TempDirectory)/tests
+        displayName: Test
+
+      - task: PublishTestResults@2
+        displayName: Publish test results
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: VSTest
+          testResultsFiles: $(Agent.TempDirectory)/tests/**/*.trx
+
+      - script: >
+          dotnet publish src/FluentFunctions.Functions/FluentFunctions.Functions.csproj
+          --configuration Release --no-build --output $(Build.ArtifactStagingDirectory)/app
+        displayName: Publish function app
+
+      - task: ArchiveFiles@2
+        displayName: Zip function app
+        inputs:
+          rootFolderOrFile: $(Build.ArtifactStagingDirectory)/app
+          includeRootFolder: false
+          archiveFile: $(Build.ArtifactStagingDirectory)/functions.zip
+
+      - publish: $(Build.ArtifactStagingDirectory)/functions.zip
+        artifact: functions
+        displayName: Upload artifact

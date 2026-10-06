@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>FluentFunctions.Templates</PackageId>
+    <Title>FluentFunctions templates</Title>
+    <Authors>FluentFunctions</Authors>
+    <Description>dotnet new template for production-ready Azure Functions apps: .NET isolated on Flex Consumption, functional core, managed identity, OpenTelemetry, Bicep/Terraform (AVM) and Azure DevOps pipelines.</Description>
+    <PackageTags>dotnet-new;templates;azure;functions;bicep;terraform</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- Overridden by CI from the git tag: dotnet pack -p:Version=1.2.3 -->
+    <Version>0.1.0-dev</Version>
+
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="templates/**/*" Exclude="templates/**/bin/**;templates/**/obj/**;templates/**/.terraform/**;templates/**/*.tfstate*;templates/**/TestResults/**" />
+    <Compile Remove="**/*" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>
